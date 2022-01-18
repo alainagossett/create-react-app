@@ -28,7 +28,9 @@ mongoose.connection
 const PeopleSchema = new mongoose.Schema({
     name: String,
     image: String,
-    title: String
+    title: String,
+    // googleId: String
+
 })
 
 const People = mongoose.model("People", PeopleSchema)
@@ -43,7 +45,7 @@ app.get('/', (req, res) => {
 //PEOPLE INDEX ROUTE
 app.get('/people', async(req, res) => {
     try {
-        res.json(await People.find({}))
+        res.json(await People.find({/*googleId: uid*/}))
     } catch(error) {
         res.status(400).json(error)
     }
