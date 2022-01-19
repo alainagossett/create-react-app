@@ -21,29 +21,6 @@ const app = express();
 //Configure Settings
 require('dotenv').config();
 
-//Mount Middleware
-app.use(cors());
-app.use(morgan('dev'));
-app.use(express.json())
-
-//Function for Authentication
-async function isAuthenticated(req, res, next) {
-    try {
-        const token = req.get('Authorization');
-        if(!token) throw new Error('You must be logged in first')
-        
-        const user = await admin.auth().verifyIdToken(token.replace('Bearer ', ''));
-        if(!user) throw new Error('Something went wrong')
-        
-        req.body.uId = user.uid;
-    
-        next();
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-    // console.log(user);
-}
-
 //Connect and Configure MongoDB
 mongoose.connect(process.env.DATABASE_URL)
 
@@ -66,6 +43,33 @@ const PeopleSchema = new mongoose.Schema({
 
 const People = mongoose.model("People", PeopleSchema)
 
+//Mount Middleware
+app.use(cors());
+app.use(morgan('dev'));
+app.use(express.json())
+
+//Function for Authentication
+async function isAuthenticated(req, res, next) {
+    try {
+        const token = req.get('Authorization');
+        if(!token) throw new Error('You must be logged in first')
+        
+        const user = await admin.auth().verifyIdToken(token.replace('Bearer ', ''));
+        if(!user) throw new Error('Something went wrong')
+        
+        req.user = user;
+    
+        next();
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+    // console.log(user);
+}
+
+
+
+
+
 //Define Routes
 
 //test route
@@ -73,37 +77,43 @@ app.get('/', (req, res) => {
     res.send("Hello World")
 });
 
-//PEOPLE INDEX ROUTE
-app.get('/people', isAuthenticated, async(req, res) => {
+async function index (req, res) {
     try {
-        res.json(await People.find({ uId: req.body.uId }))
+        res.json(await People.find({ uId: req.user.uid }))
     } catch(error) {
         res.status(400).json(error)
     }
-})
+}
+
+//PEOPLE INDEX ROUTE
+app.get('/people', isAuthenticated, index)
 
 //PEOPLE CREATE ROUTE
 app.post('/people', isAuthenticated, async(req, res) => {
     try {
-        res.json(await People.create(req.body))
+        req.body.uId = req.user.uid;
+        await People.create(req.body)
+        index(req, res);
     } catch(error) {
         res.status(400).json(error)
     }
 })
 
 //PEOPLE DELETE ROUTE
-app.delete('/people/:id', async(req, res) => {
+app.delete('/people/:id', isAuthenticated, async(req, res) => {
     try {
-        res.json(await People.findByIdAndDelete(req.params.id))
+        await People.findByIdAndDelete(req.params.id)
+        index(req, res);
     } catch (error) {
         res.status(400).json(error)
     }
 })
 
 //PEOPLE UPDATE ROUTE
-app.put('/people/:id', async(req, res) => {
+app.put('/people/:id', isAuthenticated, async(req, res) => {
     try {
-        res.json(await People.findByIdAndUpdate(req.params.id, req.body, { new: true }))
+        await People.findByIdAndUpdate(req.params.id, req.body, { new: true })
+        index(req, res);
     } catch(error) {
         res.status(400).json(error)
     }
